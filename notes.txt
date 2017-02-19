@@ -1,0 +1,2 @@
+malloc call first goes to xxmalloc in driver.cpp and from there to the malloc in statsalloc.cpp. Doesn't go to the malloc in mmapheap.h
+
