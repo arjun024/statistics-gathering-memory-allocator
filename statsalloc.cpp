@@ -1,4 +1,9 @@
 #define HEADER_SIZE sizeof(Header)
+#define KiB16 16384
+#define MB512 536870912
+#define KiB16_CLASS 1024
+#define MB512_CLASS 1039
+
 
 template <class SourceHeap>
 void * StatsAlloc<SourceHeap>::malloc(size_t sz) {
@@ -43,7 +48,6 @@ void * StatsAlloc<SourceHeap>::malloc(size_t sz) {
   free_chunk->allocatedSize = rounded_sz;
 
 success:
-
   /* Connect it to the doubly linked list tailed by @allocatedObjects */
   if (!allocatedObjects) {
     allocatedObjects = free_chunk;
@@ -58,23 +62,57 @@ success:
   /* A little stats */
   allocated += rounded_sz;
   requested += sz;
-  if (rounded_sz > maxAllocated)
-    maxAllocated = rounded_sz;
-  if (sz > maxRequested)
-    maxRequested = sz;
+  if (allocated > maxAllocated)
+    maxAllocated = allocated;
+  if (requested > maxRequested)
+    maxRequested = requested;
   return (void*)(free_chunk + 1);
 }
 
 
+
 template <class SourceHeap>
 void StatsAlloc<SourceHeap>::free(void * ptr) {
-  // FIX ME
+  Header *header, *freelist;
+  int size_class;
+  header = (Header*)ptr - 1;
+
+  /* Disconnect from SourceHeap's doubly linked list tailed by @allocatedObjects */
+  if (header == allocatedObjects)
+    allocatedObjects = header->prevObject;
+  if (header->prevObject)
+    header->prevObject->nextObject = header->nextObject;
+  if (header->nextObject)
+    header->nextObject->prevObject = header->prevObject;
+  header->prevObject = header->nextObject = NULL;
+
+  /* Connect to its free list chain */
+  size_class = getSizeClass(header->allocatedSize);
+  freelist = freedObjects[size_class];
+  freedObjects[size_class] = header;
+  header->prevObject = NULL;
+  if (!freelist) {
+    header->nextObject = NULL;
+    goto update_stats;
+  }
+  header->nextObject = freelist;
+  freelist->prevObject = header;
+
+update_stats:
+  allocated -= header->allocatedSize;
+  requested -= header->requestedSize;
 }
+
+
 
 template <class SourceHeap>
 size_t StatsAlloc<SourceHeap>::getSize(void * p) {
-  return 0; // FIX ME
+  Header *header;
+  header = (Header*)p - 1;
+  return header->allocatedSize;
 }
+
+
 
 // number of bytes currently allocated  
 template <class SourceHeap>
@@ -82,33 +120,38 @@ size_t StatsAlloc<SourceHeap>::bytesAllocated() {
   return allocated;
 }
 
+
+
 // max number of bytes allocated  
 template <class SourceHeap>
 size_t StatsAlloc<SourceHeap>::maxBytesAllocated() {
   return maxAllocated;
 }
 
+
+
 // number of bytes *requested* (e.g., malloc(4) might result in an allocation of 8; 4 = bytes requested, 8 = bytes allocated)
 template <class SourceHeap>
 size_t StatsAlloc<SourceHeap>::bytesRequested() {
   return requested;
 }
-  
+
+
+
 // max number of bytes *requested*
 template <class SourceHeap>
 size_t StatsAlloc<SourceHeap>::maxBytesRequested() {
   return maxRequested;
 }
 
+
+
 template <class SourceHeap>
 void StatsAlloc<SourceHeap>::walk(const std::function< void(Header *) >& f) {
   // FIX ME
 }
 
-#define KiB16 16384
-#define MB512 536870912
-#define KiB16_CLASS 1024
-#define MB512_CLASS 1039
+
 
 template <class SourceHeap>
 size_t StatsAlloc<SourceHeap>::getSizeFromClass(int index) {
@@ -124,12 +167,12 @@ size_t StatsAlloc<SourceHeap>::getSizeFromClass(int index) {
 }
 
 
+
 template <class SourceHeap>
 int StatsAlloc<SourceHeap>::getSizeClass(size_t sz) {
   /* The standard says that size of size_t ie. SIZE_MAX must be at least 65535 */
   /* The size of sizeClass excludes the header size */
 
-  //printf("%s\n", "in getSizeClass");
   if (sz <= 0 || sz > SIZE_MAX || sz > MB512)
     return -1;
 
