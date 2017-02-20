@@ -1,6 +1,15 @@
 Statistics-gathering memory allocator
 =====================================
 
+Author: Arjun Sreedharan
+email: asreedharan@umass.edu
+Status: Work in progress
+
+
+
+
+Problem statement
+=================
  
 
 (code templates at the [COMPSCI 630 Project 1
