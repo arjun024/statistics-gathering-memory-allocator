@@ -7,33 +7,30 @@ void * StatsAlloc<SourceHeap>::malloc(size_t sz) {
   void * heap_mem;
   Header *free_chunk;
 
-  printf("%s\n", "inside StatsAlloc::malloc");
   size_class = getSizeClass(sz);
   if (size_class < 0)
     return NULL;
 
+  /* round to the next class size */
+  rounded_sz = getSizeFromClass(size_class);
+  if (!rounded_sz)
+    return NULL;
+
   /* We try to get memory from the free list.
    * If the corresponding free list has no chunks left,
-   * we take it from the mmap-ed part.
+   * we look for memory from the SourceHeap.
    */
   free_chunk = freedObjects[size_class];
   if(free_chunk) {
-    printf("%s\n", "found a free list");
     /*remove the first chunk from this free list and give
     * it to the caller */
     freedObjects[size_class] = free_chunk->nextObject;
     if (free_chunk->nextObject) {
       freedObjects[size_class]->prevObject = NULL;
     }
-    free_chunk->prevObject = free_chunk->nextObject = NULL;
-    return free_chunk;
+    goto success;
   }
 
-  printf("%s\n", "checkin mmaped mem");
-  /* round to the next class size */
-  rounded_sz = getSizeFromClass(size_class);
-  if (!rounded_sz)
-    return NULL;
 
   total_sz = HEADER_SIZE + rounded_sz;
   heap_mem = SourceHeap::malloc(total_sz);
@@ -44,10 +41,31 @@ void * StatsAlloc<SourceHeap>::malloc(size_t sz) {
   free_chunk = (Header*) heap_mem;
   free_chunk->requestedSize = sz;
   free_chunk->allocatedSize = rounded_sz;
-  free_chunk->prevObject = free_chunk->nextObject = NULL;
+
+success:
+
+  /* Connect it to the doubly linked list tailed by @allocatedObjects */
+  if (!allocatedObjects) {
+    allocatedObjects = free_chunk;
+    free_chunk->prevObject = free_chunk->nextObject = NULL;
+  } else {
+    allocatedObjects->nextObject = free_chunk;
+    free_chunk->prevObject = allocatedObjects;
+    free_chunk->nextObject = NULL;
+    allocatedObjects = free_chunk;
+  }
+
+  /* A little stats */
+  allocated += rounded_sz;
+  requested += sz;
+  if (rounded_sz > maxAllocated)
+    maxAllocated = rounded_sz;
+  if (sz > maxRequested)
+    maxRequested = sz;
   return (void*)(free_chunk + 1);
 }
-  
+
+
 template <class SourceHeap>
 void StatsAlloc<SourceHeap>::free(void * ptr) {
   // FIX ME
@@ -61,25 +79,25 @@ size_t StatsAlloc<SourceHeap>::getSize(void * p) {
 // number of bytes currently allocated  
 template <class SourceHeap>
 size_t StatsAlloc<SourceHeap>::bytesAllocated() {
-  return 0; // FIX ME
+  return allocated;
 }
 
 // max number of bytes allocated  
 template <class SourceHeap>
 size_t StatsAlloc<SourceHeap>::maxBytesAllocated() {
-  return 0; // FIX ME
+  return maxAllocated;
 }
 
 // number of bytes *requested* (e.g., malloc(4) might result in an allocation of 8; 4 = bytes requested, 8 = bytes allocated)
 template <class SourceHeap>
 size_t StatsAlloc<SourceHeap>::bytesRequested() {
-  return 0; // FIX ME
+  return requested;
 }
   
 // max number of bytes *requested*
 template <class SourceHeap>
 size_t StatsAlloc<SourceHeap>::maxBytesRequested() {
-  return 0; // FIX ME
+  return maxRequested;
 }
 
 template <class SourceHeap>
@@ -109,8 +127,9 @@ size_t StatsAlloc<SourceHeap>::getSizeFromClass(int index) {
 template <class SourceHeap>
 int StatsAlloc<SourceHeap>::getSizeClass(size_t sz) {
   /* The standard says that size of size_t ie. SIZE_MAX must be at least 65535 */
+  /* The size of sizeClass excludes the header size */
 
-  printf("%s\n", "in getSizeClass");
+  //printf("%s\n", "in getSizeClass");
   if (sz <= 0 || sz > SIZE_MAX || sz > MB512)
     return -1;
 
@@ -122,7 +141,7 @@ int StatsAlloc<SourceHeap>::getSizeClass(size_t sz) {
    */
 
   if (sz <= KiB16)
-    return (int) ceil(sz / 16);
+    return (int) ceil(sz / 16.0);
 
   return (int) ceil(log2(sz));
 }

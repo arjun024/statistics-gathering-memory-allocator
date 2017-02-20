@@ -9,10 +9,9 @@ int main()
   cout << "-----------" << endl;
   for (int i = 0; i < 10; i++) {
     char * ptr = (char *) malloc(171);
-    printf("%p\n", ptr);
-    //*ptr = 'a' + i;
-    //*(ptr + 1) = '\0';
-    //cout << ptr << endl;
+    *ptr = 'a' + i;
+    *(ptr + 1) = '\0';
+    cout << ptr << endl;
   }
   reportStats();
   //walk([&](Header * h){ cout << "Object address = " << (void *) (h + 1) << ", requested size = " << h->requestedSize << ", allocated size = " << h->allocatedSize << endl; });

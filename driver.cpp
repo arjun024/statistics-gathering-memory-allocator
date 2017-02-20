@@ -25,11 +25,13 @@ extern "C" {
     sprintf(buf, "Max allocated = %zu\n", getHeap().maxBytesAllocated());
     printf(buf);
     sprintf(buf, "Bytes requested = %zu\n", getHeap().bytesRequested());
+    printf(buf);
+    sprintf(buf, "Bytes allocated = %zu\n", getHeap().bytesAllocated());
+    printf(buf);
   }
   
   void * xxmalloc(size_t sz)
   {
-    printf("%s\n", "hi");
     return getHeap().malloc(sz);
   }
   

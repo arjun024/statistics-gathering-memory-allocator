@@ -23,7 +23,6 @@ public:
     }
   }
   void * malloc(size_t sz) {
-    printf("%s\n", "mmapheap.h");
     if (heapRemaining < sz) {
       return nullptr;
     }
