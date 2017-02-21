@@ -1,18 +1,19 @@
 #define HEADER_SIZE sizeof(Header)
 #define LIMIT_16KB 16384
 #define LIMIT_512MB 536870912
-#define LIMIT_16KB_CLASS 1024
-#define LIMIT_512MB_CLASS 1039
+#define CLASS_16KB 1024
+#define CLASS_512MB 1039
+#define LOG_LIMIT_16KB 14
 
 
 template <class SourceHeap>
 void * StatsAlloc<SourceHeap>::malloc(size_t sz) {
   int class_index;
   size_t rounded_sz, total_sz;
-  void * heap_mem;
-  Header *free_chunk;
-  class_index = getSizeClass(sz);
+  void *heap_mem;
+  Header *mem_chunk;
 
+  class_index = getSizeClass(sz);
   if (class_index < 0)
     return NULL;
 
@@ -26,15 +27,15 @@ void * StatsAlloc<SourceHeap>::malloc(size_t sz) {
    * we look for memory from the SourceHeap.
    */
   heapLock.lock();
-  free_chunk = freedObjects[class_index];
-  if(free_chunk) {
+  mem_chunk = freedObjects[class_index];
+  if(mem_chunk) {
     /*remove the first chunk from this free list and give
     * it to the caller */
-    freedObjects[class_index] = free_chunk->nextObject;
-    if (free_chunk->nextObject) {
+    freedObjects[class_index] = mem_chunk->nextObject;
+    if (mem_chunk->nextObject) {
       freedObjects[class_index]->prevObject = NULL;
     }
-    goto success;
+    goto out;
   }
 
   total_sz = HEADER_SIZE + rounded_sz;
@@ -44,20 +45,20 @@ void * StatsAlloc<SourceHeap>::malloc(size_t sz) {
     heapLock.unlock();
     return NULL;
   }
-  free_chunk = (Header*) heap_mem;
-  free_chunk->allocatedSize = rounded_sz;
+  mem_chunk = (Header*) heap_mem;
+  mem_chunk->allocatedSize = rounded_sz;
 
-success:
-  free_chunk->requestedSize = sz;
+out:
+  mem_chunk->requestedSize = sz;
   /* Connect it to the doubly linked list tailed by @allocatedObjects */
   if (!allocatedObjects) {
-    allocatedObjects = free_chunk;
-    free_chunk->prevObject = free_chunk->nextObject = NULL;
+    allocatedObjects = mem_chunk;
+    mem_chunk->prevObject = mem_chunk->nextObject = NULL;
   } else {
-    allocatedObjects->nextObject = free_chunk;
-    free_chunk->prevObject = allocatedObjects;
-    free_chunk->nextObject = NULL;
-    allocatedObjects = free_chunk;
+    allocatedObjects->nextObject = mem_chunk;
+    mem_chunk->prevObject = allocatedObjects;
+    mem_chunk->nextObject = NULL;
+    allocatedObjects = mem_chunk;
   }
 
   /* A little stats */
@@ -68,7 +69,7 @@ success:
   if (requested > maxRequested)
     maxRequested = requested;
   heapLock.unlock();
-  return (void*)(free_chunk + 1);
+  return (void*)(mem_chunk + 1);
 }
 
 
@@ -165,14 +166,15 @@ void StatsAlloc<SourceHeap>::walk(const std::function< void(Header *) >& f) {
 template <class SourceHeap>
 size_t StatsAlloc<SourceHeap>::getSizeFromClass(int index) {
   size_t class_sz;
-  if (index <= LIMIT_16KB_CLASS)
+  if (index <= CLASS_16KB)
     return (size_t)(index * 16);
-  class_sz = (size_t) pow(2, LIMIT_16KB_CLASS - index + 16);
+  class_sz = (size_t) pow(2, index - CLASS_16KB + LOG_LIMIT_16KB);
   /* check for overflow */
   if (!class_sz) {
     perror("Out of memory!");
     return 0;
   }
+  return class_sz;
 }
 
 
@@ -181,7 +183,7 @@ template <class SourceHeap>
 int StatsAlloc<SourceHeap>::getSizeClass(size_t sz) {
   /* The standard says that size of size_t ie. SIZE_MAX must be at least 65535 */
   /* The size of sizeClass excludes the header size */
-//printf("arg: %zu\n", sz);
+
   if (sz <= 0 || sz > SIZE_MAX || sz > LIMIT_512MB)
     return -1;
 
@@ -195,6 +197,6 @@ int StatsAlloc<SourceHeap>::getSizeClass(size_t sz) {
   if (sz <= LIMIT_16KB)
     return (int) ceil(sz / 16.0);
 
-  /* Upto 2^14 (ie. LIMIT_16KB), there are 1024 classes */
-  return (int) ceil(log2(sz)) - 14 + 1024;
+  /* Upto LIMIT_16KB, there are CLASS_16KB classes */
+  return (int) ceil(log2(sz)) - LOG_LIMIT_16KB + CLASS_16KB;
 }
