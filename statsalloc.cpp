@@ -127,6 +127,7 @@ size_t StatsAlloc<SourceHeap>::getSize(void * p) {
 // number of bytes currently allocated  
 template <class SourceHeap>
 size_t StatsAlloc<SourceHeap>::bytesAllocated() {
+  /* No need of locks, this is read only */
   return allocated;
 }
 
@@ -158,7 +159,13 @@ size_t StatsAlloc<SourceHeap>::maxBytesRequested() {
 
 template <class SourceHeap>
 void StatsAlloc<SourceHeap>::walk(const std::function< void(Header *) >& f) {
-  // FIX ME
+  Header *tmp;
+  tmp = allocatedObjects;
+  while (tmp) {
+    f(tmp);
+    /* @allocatedObjects follows the tail, so we go backwards */
+    tmp = tmp->prevObject;
+  }
 }
 
 

@@ -17,9 +17,9 @@ int main()
     *(ptr + 1) = '\0';
     cout << ptr << endl;
     /* printf("%p\n", (void*)ptr); */
-    free(ptr);
+    /* free(ptr); */
   }
   reportStats();
-  //walk([&](Header * h){ cout << "Object address = " << (void *) (h + 1) << ", requested size = " << h->requestedSize << ", allocated size = " << h->allocatedSize << endl; });
+  walk([&](Header * h){ cout << "Object address = " << (void *) (h + 1) << ", requested size = " << h->requestedSize << ", allocated size = " << h->allocatedSize << endl; });
   return 0;
 }
