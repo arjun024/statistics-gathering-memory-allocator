@@ -191,7 +191,7 @@ int StatsAlloc<SourceHeap>::getSizeClass(size_t sz) {
   /* The standard says that size of size_t ie. SIZE_MAX must be at least 65535 */
   /* The size of sizeClass excludes the header size */
 
-  if (sz <= 0 || sz > SIZE_MAX || sz > LIMIT_512MB)
+  if (sz <= 0 || sz > LIMIT_512MB)
     return -1;
 
   /* 

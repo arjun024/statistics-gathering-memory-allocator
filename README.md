@@ -5,15 +5,14 @@ Author: Arjun Sreedharan
 
 email: asreedharan@umass.edu
 
-Status: Work in progress
+Status: Done
 
 notes
 =====
 
 * I have used g++ and modified the Makefile to that regard.
 
-* walk() itself causes some memory allocation as a side effect due to std::function. This is not hidden from the caller.
-
+* The memory allocated has been tested successfully for utilities like ls, find, grep, vi etc.
 
 
 
