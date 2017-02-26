@@ -1,10 +1,32 @@
-#define HEADER_SIZE sizeof(Header)
 #define LIMIT_16KB 16384
 #define LIMIT_512MB 536870912
 #define CLASS_16KB 1024
 #define CLASS_512MB 1039
 #define LOG_LIMIT_16KB 14
 
+/***********************************************************************************************
+ This part deals with aligning all memory chunks to the boundary defined by the enum Alignment.
+ The class-sizes of the segregated memory allocator does not take header size into consideration.
+ Since it is always a multiple of enum Alignment, it is always aligned.
+ Now it is only required to add an offset to the header's size to make the header always aligned.
+ Making both the header and usable-memory independently aligned makes the allocator very portable
+ and easy to maintain.
+ Calculation of offset is inspired by Doug Lea's memory allocator.
+ ************************************************************************************************/
+
+#define MEM_ALIGN_MASK (Alignment - (size_t)1)
+
+#define is_aligned(X) (((size_t)((X)) & (MEM_ALIGN_MASK)) == 0)
+
+#define calc_align_offset(X) \
+  (is_aligned(X) ? 0 : \
+    ((Alignment - ((size_t)(X) & MEM_ALIGN_MASK)) & MEM_ALIGN_MASK))
+
+#define HEADER_ORIG_SIZE sizeof(Header)
+
+#define HEADER_ALIGNED_SIZE (HEADER_ORIG_SIZE + calc_align_offset(HEADER_ORIG_SIZE))
+
+/***********************************************************************************************/
 
 template <class SourceHeap>
 void * StatsAlloc<SourceHeap>::malloc(size_t sz) {
@@ -38,7 +60,7 @@ void * StatsAlloc<SourceHeap>::malloc(size_t sz) {
     goto out;
   }
 
-  total_sz = HEADER_SIZE + rounded_sz;
+  total_sz = HEADER_ALIGNED_SIZE + rounded_sz;
   heap_mem = SourceHeap::malloc(total_sz);
   if (!heap_mem) {
     perror("Out of Memory!!");
@@ -69,7 +91,7 @@ out:
   if (requested > maxRequested)
     maxRequested = requested;
   heapLock.unlock();
-  return (void*)(mem_chunk + 1);
+  return (void*)((char*)mem_chunk + HEADER_ALIGNED_SIZE);
 }
 
 
@@ -81,7 +103,7 @@ void StatsAlloc<SourceHeap>::free(void * ptr) {
   if (!ptr)
     return;
   heapLock.lock();
-  header = (Header*) ptr - 1;
+  header = (Header*)((char*)ptr - HEADER_ALIGNED_SIZE);
 
   /* Disconnect from SourceHeap's doubly linked list tailed by @allocatedObjects */
   if (header == allocatedObjects)
@@ -101,7 +123,6 @@ void StatsAlloc<SourceHeap>::free(void * ptr) {
     perror("Memory error.");
     return;
   }
-
   freelist = freedObjects[class_index];
   freedObjects[class_index] = header;
   header->prevObject = NULL;
@@ -118,7 +139,7 @@ void StatsAlloc<SourceHeap>::free(void * ptr) {
 template <class SourceHeap>
 size_t StatsAlloc<SourceHeap>::getSize(void * p) {
   Header *header;
-  header = (Header*)p - 1;
+  header = (Header*)((char*)p - HEADER_ALIGNED_SIZE);
   return header->allocatedSize;
 }
 

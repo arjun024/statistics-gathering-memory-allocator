@@ -20,7 +20,6 @@ int main()
     /* free(ptr); */
   }
   reportStats();
-  printf("%s\n", "* walk() itself causes some memory allocation as a side effect due to std::function. This is not hidden from the caller.");
   walk([&](Header * h){ cout << "Object address = " << (void *) (h + 1) << ", requested size = " << h->requestedSize << ", allocated size = " << h->allocatedSize << endl; });
   return 0;
 }
