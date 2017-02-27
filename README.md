@@ -10,7 +10,7 @@ Status: Done
 notes
 =====
 
-* I have used g++ and modified the Makefile to that regard.
+* I have used g++ and modified the Makefile to that regard. Works correctly with original Makefile as well (see Makefile.bkup)
 
 * The memory allocated has been tested successfully for utilities like ls, find, grep, vi etc.
 
