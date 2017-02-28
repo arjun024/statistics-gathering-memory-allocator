@@ -127,6 +127,7 @@ void StatsAlloc<SourceHeap>::free(void * ptr) {
   class_index = getSizeClass(header->allocatedSize);
   if (class_index < 0) {
     perror("Memory error.");
+    heapLock.unlock();
     return;
   }
   freelist = freedObjects[class_index];
