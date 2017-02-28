@@ -100,8 +100,14 @@ template <class SourceHeap>
 void StatsAlloc<SourceHeap>::free(void * ptr) {
   Header *header, *freelist;
   int class_index;
+
   if (!ptr)
     return;
+
+  /* If address in unaligned, die gracefully and immediately */
+  if (!is_aligned(ptr))
+    return;
+
   heapLock.lock();
   header = (Header*)((char*)ptr - HEADER_ALIGNED_SIZE);
 
